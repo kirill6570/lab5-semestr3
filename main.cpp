@@ -191,13 +191,25 @@ string makeChart(bool hasScreenshot) {
     return svg + "</g></svg>";
 }
 
+// Проверяем путь до генерации, чтобы ошибку ввода можно было исправить.
+void validateScreenshot(const fs::path& path) {
+    if (path.empty()) return;
+    const string ext = path.extension().string();
+    if (ext != ".png" && ext != ".jpg" && ext != ".jpeg")
+        throw runtime_error("Для скриншота нужен файл PNG или JPG. Введите путь, а не команду.");
+    error_code error;
+    if (!fs::is_regular_file(path, error))
+        throw runtime_error("Файл не найден или недоступен: " + path.string());
+    ifstream image(path, ios::binary);
+    if (!image) throw runtime_error("Не удалось открыть изображение: " + path.string());
+}
+
 void generate(LabData data, const fs::path& output, const fs::path& assets) {
+    validateScreenshot(data.screenshot);
     fs::create_directories(output / "assets");
     writeFile(output / "assets/uml.svg", readFile(assets / "uml.svg"));
     if (!data.screenshot.empty()) {
         string ext = data.screenshot.extension().string();
-        if (ext != ".png" && ext != ".jpg" && ext != ".jpeg")
-            throw runtime_error("Для скриншота нужен файл PNG или JPG.");
         fs::path target = output / ("assets/screenshot" + ext);
         if (fs::weakly_canonical(data.screenshot) != fs::weakly_canonical(target))
             fs::copy_file(data.screenshot, target, fs::copy_options::overwrite_existing);
@@ -215,6 +227,27 @@ string ask(const string& prompt) {
     string answer;
     if (!getline(cin, answer)) throw runtime_error("Ввод завершён до заполнения данных.");
     return answer;
+}
+
+string askRequired(const string& prompt) {
+    while (true) {
+        string answer = ask(prompt);
+        if (answer.find_first_not_of(" \t\r") != string::npos) return answer;
+        cout << "Поле не должно быть пустым. Повторите ввод.\n";
+    }
+}
+
+fs::path askScreenshot() {
+    while (true) {
+        fs::path path = ask("Путь к скриншоту PNG/JPG (Enter — без рисунка): ");
+        try {
+            validateScreenshot(path);
+            return path;
+        } catch (const runtime_error& error) {
+            cout << "Ошибка: " << error.what()
+                 << "\nПопробуйте ещё раз или нажмите Enter без рисунка. Выход — Ctrl+C.\n";
+        }
+    }
 }
 
 int askNumber(const string& prompt, int low, int high) {
@@ -255,13 +288,11 @@ int main(int argc, char* argv[]) {
             for (size_t i = 0; i < disciplines.size(); ++i) cout << i + 1 << ". " << disciplines[i] << '\n';
             data.discipline = disciplines[askNumber("Дисциплина (1–3): ", 1, 3) - 1];
             data.number = askNumber("Номер лабораторной работы (1–99): ", 1, 99);
-            data.title = ask("Тема работы: ");
-            data.goal = ask("Цель работы: ");
-            data.task = ask("Задание: ");
-            data.conclusion = ask("Вывод: ");
-            data.screenshot = ask("Путь к скриншоту PNG/JPG (Enter — без рисунка): ");
-            if (data.title.empty() || data.goal.empty() || data.task.empty() || data.conclusion.empty())
-                throw runtime_error("Тема, цель, задание и вывод не должны быть пустыми.");
+            data.title = askRequired("Тема работы: ");
+            data.goal = askRequired("Цель работы: ");
+            data.task = askRequired("Задание: ");
+            data.conclusion = askRequired("Вывод: ");
+            data.screenshot = askScreenshot();
             generate(data, output / "custom", "assets");
         }
         return 0;
