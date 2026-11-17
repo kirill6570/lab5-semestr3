@@ -1,0 +1,4 @@
+{
+  "version":"0.2.0",
+  "configurations":[{"name":"ЛР5 — интерактивный запуск","type":"cppdbg","request":"launch","program":"${workspaceFolder}/lab5","args":[],"cwd":"${workspaceFolder}","externalConsole":false,"MIMode":"gdb","preLaunchTask":"Сборка ЛР5"}]
+}

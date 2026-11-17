@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ЛР №5 — Информатика</title><style>.identity{position:sticky;top:0;background:#22374d;color:white;padding:8px 16px;font:12px/1.4 sans-serif;z-index:2;text-align:center}@media print{.identity{display:none}}body{margin:0;background:#e9edf2;color:#171717;font:14pt/1.5 'Times New Roman',serif}main{box-sizing:border-box;max-width:210mm;margin:24px auto;padding:20mm 15mm 20mm 30mm;background:white}p{text-align:justify;text-indent:1.25cm;margin:0 0 12px}h1{font-size:20pt}h2{font-size:16pt}header{text-align:center;border-bottom:1px solid #bbb;padding-bottom:20px}header p{text-align:center;text-indent:0}table{width:100%;border-collapse:collapse;font-size:12pt}th,td{border:1px solid #777;padding:8px;text-align:justify}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f5f7;padding:12px;font:9pt/1.3 monospace}figure{margin:20px 0}figure img{max-width:100%;height:auto}figcaption{text-align:center;font-size:12pt}section{margin-top:24px}@media print{body{background:white}main{margin:0;max-width:none;padding:0}header{break-after:page}h2{break-after:avoid}figure,tr{break-inside:avoid}@page{size:A4;margin:20mm 15mm 20mm 30mm}}@media(max-width:700px){main{margin:0;padding:20px}h1{font-size:18pt}}</style></head><body><aside class="identity">Короткевич Кирилл Олегович | АБ-522 | 17.11.2026 19:14:14</aside><main><header><p>Новосибирский государственный технический университет</p><h1>Лабораторная работа №5</h1><p>Информатика</p><h2>Генерация отчётов. Паттерн Строитель</h2><p>Короткевич Кирилл Олегович | АБ-522</p><p>Сформировано: 17.11.2026 19:14:14</p></header>
+<section><h2>1 Цель и задание</h2><p><strong>Цель:</strong> Освоить пошаговое построение HTML-документа с использованием наследования и полиморфизма.</p><p><strong>Задание:</strong> Сформировать демонстрационный отчёт с титульным листом, целью, UML, листингом, таблицей, диаграммами и рисунком.</p></section>
+<section><h2>2 Диаграмма классов UML</h2><figure><img src="assets/uml.svg" alt="UML классов генератора отчётов"><figcaption>Рисунок 1 — Структура паттерна Строитель</figcaption></figure></section>
+<section><h2>3 Листинг программы</h2><details><summary>Исходный код программы</summary><pre><code>#include &lt;algorithm&gt;
+#include &lt;chrono&gt;
+#include &lt;ctime&gt;
+#include &lt;filesystem&gt;
+#include &lt;fstream&gt;
+#include &lt;iomanip&gt;
+#include &lt;iostream&gt;
+#include &lt;memory&gt;
+#include &lt;sstream&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;vector&gt;
+
+using namespace std;
+namespace fs = filesystem;
+
+// Исходные данные. Одни и те же поля используются для трёх дисциплин.
+struct LabData {
+    string discipline, author, group, title, goal, task, conclusion, date;
+    int number = 5;
+    string source;
+    fs::path screenshot;
+};
+
+string escapeHtml(const string&amp; text) {
+    string result;
+    for (char c : text) {
+        switch (c) {
+        case &#39;&amp;&#39;: result += &quot;&amp;amp;&quot;; break;
+        case &#39;&lt;&#39;: result += &quot;&amp;lt;&quot;; break;
+        case &#39;&gt;&#39;: result += &quot;&amp;gt;&quot;; break;
+        case &#39;&quot;&#39;: result += &quot;&amp;quot;&quot;; break;
+        case &#39;\&#39;&#39;: result += &quot;&amp;#39;&quot;; break;
+        default: result += c;
+        }
+    }
+    return result;
+}
+
+string readFile(const fs::path&amp; path) {
+    ifstream file(path, ios::binary);
+    if (!file) throw runtime_error(&quot;Не удалось открыть файл: &quot; + path.string());
+    string text((istreambuf_iterator&lt;char&gt;(file)), istreambuf_iterator&lt;char&gt;());
+    if (file.bad()) throw runtime_error(&quot;Ошибка чтения: &quot; + path.string());
+    return text;
+}
+
+void writeFile(const fs::path&amp; path, const string&amp; text) {
+    ofstream file(path, ios::binary);
+    if (!file) throw runtime_error(&quot;Не удалось создать файл: &quot; + path.string());
+    file &lt;&lt; text;
+    file.close();
+    if (!file) throw runtime_error(&quot;Ошибка записи: &quot; + path.string());
+}
+
+string currentDate() {
+    time_t now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+    tm value = *localtime(&amp;now);
+    ostringstream out;
+    out &lt;&lt; put_time(&amp;value, &quot;%d.%m.%Y %H:%M:%S&quot;);
+    return out.str();
+}
+
+// Продукт: готовый документ. Данные закрыты от прямого изменения извне.
+class Report {
+    string html;
+public:
+    void append(const string&amp; part) { html += part; }
+    const string&amp; getHtml() const { return html; }
+    void save(const fs::path&amp; path) const { writeFile(path, html); }
+};
+
+// Абстрактный строитель задаёт шаги построения, но не формат документа.
+class ReportBuilder {
+public:
+    virtual ~ReportBuilder() = default;
+    virtual void reset(const LabData&amp; data) = 0;
+    virtual void buildTitle() = 0;
+    virtual void buildIntroduction() = 0;
+    virtual void buildUml() = 0;
+    virtual void buildListing() = 0;
+    virtual void buildResults() = 0;
+    virtual void buildConclusion() = 0;
+    virtual Report getResult() const = 0;
+};
+
+// Конкретный строитель создаёт HTML. Другой формат можно добавить наследником.
+class HtmlReportBuilder : public ReportBuilder {
+    Report report;
+    LabData data;
+    void section(const string&amp; title, const string&amp; body) {
+        report.append(&quot;&lt;section&gt;&lt;h2&gt;&quot; + title + &quot;&lt;/h2&gt;&quot; + body + &quot;&lt;/section&gt;\n&quot;);
+    }
+public:
+    void reset(const LabData&amp; value) override {
+        data = value;
+        report = Report(); // Повторная сборка не накапливает старые разделы.
+    }
+    void buildTitle() override {
+        report.append(&quot;&lt;!DOCTYPE html&gt;\n&lt;html lang=\&quot;ru\&quot;&gt;&lt;head&gt;&lt;meta charset=\&quot;UTF-8\&quot;&gt;&quot;
+            &quot;&lt;meta name=\&quot;viewport\&quot; content=\&quot;width=device-width, initial-scale=1\&quot;&gt;&quot;
+            &quot;&lt;title&gt;ЛР №&quot; + to_string(data.number) + &quot; — &quot; + escapeHtml(data.discipline) + &quot;&lt;/title&gt;&quot;
+            &quot;&lt;style&gt;.identity{position:sticky;top:0;background:#22374d;color:white;padding:8px 16px;font:12px/1.4 sans-serif;z-index:2;text-align:center}@media print{.identity{display:none}}body{margin:0;background:#e9edf2;color:#171717;font:14pt/1.5 &#39;Times New Roman&#39;,serif}&quot;
+            &quot;main{box-sizing:border-box;max-width:210mm;margin:24px auto;padding:20mm 15mm 20mm 30mm;background:white}&quot;
+            &quot;p{text-align:justify;text-indent:1.25cm;margin:0 0 12px}h1{font-size:20pt}h2{font-size:16pt}&quot;
+            &quot;header{text-align:center;border-bottom:1px solid #bbb;padding-bottom:20px}header p{text-align:center;text-indent:0}&quot;
+            &quot;table{width:100%;border-collapse:collapse;font-size:12pt}th,td{border:1px solid #777;padding:8px;text-align:justify}&quot;
+            &quot;pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f5f7;padding:12px;font:9pt/1.3 monospace}&quot;
+            &quot;figure{margin:20px 0}figure img{max-width:100%;height:auto}figcaption{text-align:center;font-size:12pt}&quot;
+            &quot;section{margin-top:24px}@media print{body{background:white}main{margin:0;max-width:none;padding:0}&quot;
+            &quot;header{break-after:page}h2{break-after:avoid}figure,tr{break-inside:avoid}@page{size:A4;margin:20mm 15mm 20mm 30mm}}&quot;
+            &quot;@media(max-width:700px){main{margin:0;padding:20px}h1{font-size:18pt}}&quot;
+            &quot;&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&lt;aside class=\&quot;identity\&quot;&gt;&quot; + escapeHtml(data.author) + &quot; | &quot; + escapeHtml(data.group) + &quot; | &quot; + escapeHtml(data.date) + &quot;&lt;/aside&gt;&lt;main&gt;&lt;header&gt;&quot;
+            &quot;&lt;p&gt;Новосибирский государственный технический университет&lt;/p&gt;&quot;
+            &quot;&lt;h1&gt;Лабораторная работа №&quot; + to_string(data.number) + &quot;&lt;/h1&gt;&lt;p&gt;&quot; + escapeHtml(data.discipline) + &quot;&lt;/p&gt;&quot;
+            &quot;&lt;h2&gt;&quot; + escapeHtml(data.title) + &quot;&lt;/h2&gt;&lt;p&gt;&quot; + escapeHtml(data.author) + &quot; | &quot; + escapeHtml(data.group) + &quot;&lt;/p&gt;&quot;
+            &quot;&lt;p&gt;Сформировано: &quot; + escapeHtml(data.date) + &quot;&lt;/p&gt;&lt;/header&gt;\n&quot;);
+    }
+    void buildIntroduction() override {
+        section(&quot;1 Цель и задание&quot;, &quot;&lt;p&gt;&lt;strong&gt;Цель:&lt;/strong&gt; &quot; + escapeHtml(data.goal) + &quot;&lt;/p&gt;&quot;
+            &quot;&lt;p&gt;&lt;strong&gt;Задание:&lt;/strong&gt; &quot; + escapeHtml(data.task) + &quot;&lt;/p&gt;&quot;);
+    }
+    void buildUml() override {
+        section(&quot;2 Диаграмма классов UML&quot;, &quot;&lt;figure&gt;&lt;img src=\&quot;assets/uml.svg\&quot; alt=\&quot;UML классов генератора отчётов\&quot;&gt;&quot;
+            &quot;&lt;figcaption&gt;Рисунок 1 — Структура паттерна Строитель&lt;/figcaption&gt;&lt;/figure&gt;&quot;);
+    }
+    void buildListing() override {
+        section(&quot;3 Листинг программы&quot;, &quot;&lt;details&gt;&lt;summary&gt;Исходный код программы&lt;/summary&gt;&lt;pre&gt;&lt;code&gt;&quot; + escapeHtml(data.source) + &quot;&lt;/code&gt;&lt;/pre&gt;&lt;/details&gt;&quot;);
+    }
+    void buildResults() override {
+        string body = &quot;&lt;p&gt;Документ собран из шести последовательных шагов. Таблица отражает структуру полученного отчёта.&lt;/p&gt;&quot;
+            &quot;&lt;table&gt;&lt;caption&gt;Таблица 1 — Элементы отчёта&lt;/caption&gt;&lt;thead&gt;&lt;tr&gt;&lt;th&gt;Элемент&lt;/th&gt;&lt;th&gt;Содержание&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&quot;;
+        const vector&lt;vector&lt;string&gt;&gt; rows = {
+            {&quot;Титульный лист&quot;, &quot;Дисциплина, тема, автор, группа и дата&quot;},
+            {&quot;Цель и задание&quot;, &quot;Исходные данные выбранной лабораторной работы&quot;},
+            {&quot;UML&quot;, &quot;Связи классов Builder, Director и Report&quot;},
+            {&quot;Листинг&quot;, &quot;Исходный код из физического файла main.cpp&quot;},
+            {&quot;Результаты&quot;, &quot;Таблица, диаграмма и рисунок при его выборе&quot;},
+            {&quot;Вывод&quot;, &quot;Итог, заданный пользователем&quot;}
+        };
+        for (const auto&amp; row : rows)
+            body += &quot;&lt;tr&gt;&lt;td&gt;&quot; + escapeHtml(row[0]) + &quot;&lt;/td&gt;&lt;td&gt;&quot; + escapeHtml(row[1]) + &quot;&lt;/td&gt;&lt;/tr&gt;&quot;;
+        body += &quot;&lt;/tbody&gt;&lt;/table&gt;&lt;figure&gt;&lt;img src=\&quot;assets/structure.svg\&quot; alt=\&quot;Состав отчёта\&quot;&gt;&quot;
+            &quot;&lt;figcaption&gt;Рисунок 2 — Количество элементов в структуре отчёта&lt;/figcaption&gt;&lt;/figure&gt;&quot;;
+        if (!data.screenshot.empty())
+            body += &quot;&lt;figure&gt;&lt;img src=\&quot;assets/screenshot&quot; + data.screenshot.extension().string() +
+                &quot;\&quot; alt=\&quot;Снимок результата работы\&quot;&gt;&lt;figcaption&gt;Рисунок 3 — Снимок результата работы&lt;/figcaption&gt;&lt;/figure&gt;&quot;;
+        section(&quot;4 Результаты работы&quot;, body);
+    }
+    void buildConclusion() override {
+        section(&quot;5 Вывод&quot;, &quot;&lt;p&gt;&quot; + escapeHtml(data.conclusion) + &quot;&lt;/p&gt;&quot;);
+        report.append(&quot;&lt;/main&gt;&lt;/body&gt;&lt;/html&gt;\n&quot;);
+    }
+    Report getResult() const override { return report; }
+};
+
+// Директор знает порядок шагов и работает через ссылку на абстрактный класс.
+class Director {
+public:
+    Report construct(ReportBuilder&amp; builder, const LabData&amp; data) const {
+        builder.reset(data);
+        builder.buildTitle();
+        builder.buildIntroduction();
+        builder.buildUml();
+        builder.buildListing();
+        builder.buildResults();
+        builder.buildConclusion();
+        return builder.getResult();
+    }
+};
+
+const vector&lt;string&gt; disciplines = {
+    &quot;Программирование&quot;, &quot;Информатика&quot;, &quot;Технологии и методы программирования&quot;
+};
+
+// Диаграмма строится по фактическому числу элементов текущего документа.
+string makeChart(bool hasScreenshot) {
+    const vector&lt;pair&lt;string, int&gt;&gt; values = {
+        {&quot;Разделы сборки&quot;, 6}, {&quot;Таблицы&quot;, 1}, {&quot;SVG-диаграммы&quot;, 2}, {&quot;Скриншоты&quot;, hasScreenshot ? 1 : 0}
+    };
+    string svg = &quot;&lt;svg xmlns=\&quot;http://www.w3.org/2000/svg\&quot; width=\&quot;760\&quot; height=\&quot;240\&quot; viewBox=\&quot;0 0 760 240\&quot;&gt;&quot;
+        &quot;&lt;rect width=\&quot;760\&quot; height=\&quot;240\&quot; fill=\&quot;white\&quot;/&gt;&lt;g font-family=\&quot;sans-serif\&quot; font-size=\&quot;17\&quot;&gt;&quot;;
+    int y = 28;
+    for (const auto&amp; value : values) {
+        svg += &quot;&lt;text x=\&quot;12\&quot; y=\&quot;&quot; + to_string(y + 21) + &quot;\&quot;&gt;&quot; + value.first + &quot;&lt;/text&gt;&quot;
+            &quot;&lt;rect x=\&quot;220\&quot; y=\&quot;&quot; + to_string(y) + &quot;\&quot; width=\&quot;&quot; + to_string(value.second * 65) +
+            &quot;\&quot; height=\&quot;30\&quot; fill=\&quot;#375e8d\&quot;/&gt;&lt;text x=\&quot;&quot; + to_string(230 + value.second * 65) +
+            &quot;\&quot; y=\&quot;&quot; + to_string(y + 21) + &quot;\&quot;&gt;&quot; + to_string(value.second) + &quot;&lt;/text&gt;&quot;;
+        y += 52;
+    }
+    return svg + &quot;&lt;/g&gt;&lt;/svg&gt;&quot;;
+}
+
+void generate(LabData data, const fs::path&amp; output, const fs::path&amp; assets) {
+    fs::create_directories(output / &quot;assets&quot;);
+    writeFile(output / &quot;assets/uml.svg&quot;, readFile(assets / &quot;uml.svg&quot;));
+    if (!data.screenshot.empty()) {
+        string ext = data.screenshot.extension().string();
+        if (ext != &quot;.png&quot; &amp;&amp; ext != &quot;.jpg&quot; &amp;&amp; ext != &quot;.jpeg&quot;)
+            throw runtime_error(&quot;Для скриншота нужен файл PNG или JPG.&quot;);
+        fs::path target = output / (&quot;assets/screenshot&quot; + ext);
+        if (fs::weakly_canonical(data.screenshot) != fs::weakly_canonical(target))
+            fs::copy_file(data.screenshot, target, fs::copy_options::overwrite_existing);
+    }
+    writeFile(output / &quot;assets/structure.svg&quot;, makeChart(!data.screenshot.empty()));
+    unique_ptr&lt;ReportBuilder&gt; builder = make_unique&lt;HtmlReportBuilder&gt;();
+    Director director;
+    Report report = director.construct(*builder, data);
+    report.save(output / &quot;report.html&quot;);
+    cout &lt;&lt; &quot;Создан отчёт: &quot; &lt;&lt; fs::absolute(output / &quot;report.html&quot;) &lt;&lt; &#39;\n&#39;;
+}
+
+string ask(const string&amp; prompt) {
+    cout &lt;&lt; prompt;
+    string answer;
+    if (!getline(cin, answer)) throw runtime_error(&quot;Ввод завершён до заполнения данных.&quot;);
+    return answer;
+}
+
+int askNumber(const string&amp; prompt, int low, int high) {
+    while (true) {
+        string text = ask(prompt);
+        istringstream input(text);
+        int value; char extra;
+        if ((input &gt;&gt; value) &amp;&amp; !(input &gt;&gt; extra) &amp;&amp; value &gt;= low &amp;&amp; value &lt;= high) return value;
+        cout &lt;&lt; &quot;Введите целое число от &quot; &lt;&lt; low &lt;&lt; &quot; до &quot; &lt;&lt; high &lt;&lt; &quot;.\n&quot;;
+    }
+}
+
+int main(int argc, char* argv[]) {
+    try {
+        cout &lt;&lt; &quot;=== Генератор HTML-отчётов | ЛР №5 | Вариант 10 ===\n&quot;;
+        const bool demo = argc &gt;= 2 &amp;&amp; string(argv[1]) == &quot;--demo&quot;;
+        if (argc &gt; 3 || (argc &gt;= 2 &amp;&amp; !demo)) {
+            cerr &lt;&lt; &quot;Запуск: lab5 [--demo [каталог результатов]]\n&quot;;
+            return 1;
+        }
+        fs::path output = argc == 3 ? fs::path(argv[2]) : fs::path(&quot;generated&quot;);
+        LabData data;
+        data.author = &quot;Короткевич Кирилл Олегович&quot;;
+        data.group = &quot;АБ-522&quot;;
+        data.date = currentDate();
+        data.source = readFile(&quot;main.cpp&quot;);
+        if (demo) {
+            data.title = &quot;Генерация отчётов. Паттерн Строитель&quot;;
+            data.goal = &quot;Освоить пошаговое построение HTML-документа с использованием наследования и полиморфизма.&quot;;
+            data.task = &quot;Сформировать демонстрационный отчёт с титульным листом, целью, UML, листингом, таблицей, диаграммами и рисунком.&quot;;
+            data.conclusion = &quot;Демонстрационный документ сформирован. Директор определяет последовательность шагов, а HTML-строитель — представление разделов.&quot;;
+            if (fs::exists(&quot;assets/demo-preview.png&quot;)) data.screenshot = &quot;assets/demo-preview.png&quot;;
+            for (size_t i = 0; i &lt; disciplines.size(); ++i) {
+                data.discipline = disciplines[i];
+                generate(data, output / (&quot;discipline-&quot; + to_string(i + 1)), &quot;assets&quot;);
+            }
+        } else {
+            for (size_t i = 0; i &lt; disciplines.size(); ++i) cout &lt;&lt; i + 1 &lt;&lt; &quot;. &quot; &lt;&lt; disciplines[i] &lt;&lt; &#39;\n&#39;;
+            data.discipline = disciplines[askNumber(&quot;Дисциплина (1–3): &quot;, 1, 3) - 1];
+            data.number = askNumber(&quot;Номер лабораторной работы (1–99): &quot;, 1, 99);
+            data.title = ask(&quot;Тема работы: &quot;);
+            data.goal = ask(&quot;Цель работы: &quot;);
+            data.task = ask(&quot;Задание: &quot;);
+            data.conclusion = ask(&quot;Вывод: &quot;);
+            data.screenshot = ask(&quot;Путь к скриншоту PNG/JPG (Enter — без рисунка): &quot;);
+            if (data.title.empty() || data.goal.empty() || data.task.empty() || data.conclusion.empty())
+                throw runtime_error(&quot;Тема, цель, задание и вывод не должны быть пустыми.&quot;);
+            generate(data, output / &quot;custom&quot;, &quot;assets&quot;);
+        }
+        return 0;
+    } catch (const exception&amp; error) {
+        cerr &lt;&lt; &quot;Ошибка: &quot; &lt;&lt; error.what() &lt;&lt; &#39;\n&#39;;
+        return 1;
+    }
+}
+</code></pre></details></section>
+<section><h2>4 Результаты работы</h2><p>Документ собран из шести последовательных шагов. Таблица отражает структуру полученного отчёта.</p><table><caption>Таблица 1 — Элементы отчёта</caption><thead><tr><th>Элемент</th><th>Содержание</th></tr></thead><tbody><tr><td>Титульный лист</td><td>Дисциплина, тема, автор, группа и дата</td></tr><tr><td>Цель и задание</td><td>Исходные данные выбранной лабораторной работы</td></tr><tr><td>UML</td><td>Связи классов Builder, Director и Report</td></tr><tr><td>Листинг</td><td>Исходный код из физического файла main.cpp</td></tr><tr><td>Результаты</td><td>Таблица, диаграмма и рисунок при его выборе</td></tr><tr><td>Вывод</td><td>Итог, заданный пользователем</td></tr></tbody></table><figure><img src="assets/structure.svg" alt="Состав отчёта"><figcaption>Рисунок 2 — Количество элементов в структуре отчёта</figcaption></figure><figure><img src="assets/screenshot.png" alt="Снимок результата работы"><figcaption>Рисунок 3 — Снимок результата работы</figcaption></figure></section>
+<section><h2>5 Вывод</h2><p>Демонстрационный документ сформирован. Директор определяет последовательность шагов, а HTML-строитель — представление разделов.</p></section>
+</main></body></html>
