@@ -7,7 +7,7 @@
 Откройте папку «Лаба№5». В меню «Терминал → Создать терминал» выполните:
 
 ```bash
-g++ -std=c++17 -Wall -Wextra -Wpedantic main.cpp -o lab5
+g++ -std=c++17 -Wall -Wextra -Wpedantic -Iinclude main.cpp src/*.cpp -o lab5
 ./lab5
 ```
 
@@ -25,7 +25,7 @@ Ctrl+Shift+B собирает программу через подготовле
 
 Каждый запуск получает отдельную папку `generated/demo-001`, `demo-002` и далее. Внутри — `discipline-1`, `discipline-2`, `discipline-3`, у каждой свой `report.html`. Темы, цели, задания и выводы трёх примеров различаются. Это демонстрация генератора для трёх дисциплин, а не три выполненные лабораторные. Пример изображения — реальный снимок сформированного HTML. Его можно заменить в `assets/demo-preview.png`.
 
-`./lab5 --demo my-reports` задаёт другой каталог. Запускайте программу из папки проекта: main.cpp и assets/uml.svg читаются по относительным путям.
+`./lab5 --demo my-reports` задаёт другой каталог. Запускайте программу из папки проекта: main.cpp, include, src и assets/uml.svg читаются по относительным путям. Для листинга HTML программа читает все исходные файлы проекта.
 
 ## Структура паттерна
 
@@ -51,3 +51,17 @@ python3 tests/test_cli.py
 https://github.com/kirill6570/lab5-semestr3
 
 При ошибке в пути к изображению программа повторяет запрос и сохраняет введённые данные. Enter пропускает рисунок, Ctrl+C завершает программу. Пустые обязательные поля также запрашиваются повторно.
+
+## Файлы проекта
+
+- `main.cpp` — меню, заполнение данных и запуск генерации.
+- `include/LabData.h` — данные отчёта.
+- `include/Report.h`, `src/Report.cpp` — продукт: готовый документ.
+- `include/ReportBuilder.h` — интерфейс абстрактного строителя.
+- `include/HtmlReportBuilder.h`, `src/HtmlReportBuilder.cpp` — сборка HTML-разделов.
+- `include/Director.h`, `src/Director.cpp` — порядок шагов сборки.
+- `include/ReportGenerator.h`, `src/ReportGenerator.cpp` — генерация файлов и диаграммы.
+- `include/ConsoleInput.h`, `src/ConsoleInput.cpp` — ввод с повторным запросом при ошибках.
+- `include/FileUtils.h`, `src/FileUtils.cpp` — работа с файлами, датой, ссылками и экранированием HTML.
+
+Объявления находятся в `.h`, реализации — в `.cpp`. CMake собирает общую библиотеку `report_core`, которую используют программа и тесты. В VS Code задача Ctrl+Shift+B также собирает все модули.

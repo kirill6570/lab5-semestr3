@@ -1,6 +1,8 @@
-#define main lab5_console_main
-#include "../main.cpp"
-#undef main
+#include "HtmlReportBuilder.h"
+#include "Director.h"
+#include "ReportGenerator.h"
+#include <iostream>
+using namespace std;
 #include <cassert>
 
 int main() {

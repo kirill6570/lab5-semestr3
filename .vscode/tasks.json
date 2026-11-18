@@ -1,7 +1,50 @@
 {
   "version": "2.0.0",
   "tasks": [
-    {"label":"Сборка ЛР5","type":"process","command":"g++","args":["-std=c++17","-Wall","-Wextra","-Wpedantic","-g","main.cpp","-o","lab5"],"options":{"cwd":"${workspaceFolder}"},"group":{"kind":"build","isDefault":true},"problemMatcher":["$gcc"]},
-    {"label":"Демонстрация трёх дисциплин","type":"process","command":"${workspaceFolder}/lab5","args":["--demo"],"options":{"cwd":"${workspaceFolder}"},"dependsOn":"Сборка ЛР5","problemMatcher":[]}
+    {
+      "label": "Сборка ЛР5",
+      "type": "process",
+      "command": "g++",
+      "args": [
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Wpedantic",
+        "-g",
+        "-Iinclude",
+        "main.cpp",
+        "src/Report.cpp",
+        "src/HtmlReportBuilder.cpp",
+        "src/Director.cpp",
+        "src/FileUtils.cpp",
+        "src/ConsoleInput.cpp",
+        "src/ReportGenerator.cpp",
+        "-o",
+        "lab5"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "Демонстрация трёх дисциплин",
+      "type": "process",
+      "command": "${workspaceFolder}/lab5",
+      "args": [
+        "--demo"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "Сборка ЛР5",
+      "problemMatcher": []
+    }
   ]
 }

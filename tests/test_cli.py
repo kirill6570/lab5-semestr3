@@ -32,6 +32,8 @@ with tempfile.TemporaryDirectory() as temporary:
         text = report.read_text()
         texts.append(text)
         assert name in text and '<table>' in text and '<code>' in text
+        assert '// ===== src/HtmlReportBuilder.cpp =====' in text
+        assert '// ===== include/ReportBuilder.h =====' in text
         parser = Images(); parser.feed(text)
         assert all((report.parent / path).is_file() for path in parser.paths)
     expected_titles = ['Генерация HTML-отчётов. Паттерн Строитель',
@@ -51,7 +53,8 @@ with tempfile.TemporaryDirectory() as temporary:
     missing = subprocess.run([str(BIN), '--demo'], cwd=temporary, capture_output=True)
     assert missing.returncode == 1
     shutil.copy2(ROOT / 'main.cpp', Path(temporary) / 'main.cpp')
-    shutil.copytree(ROOT / 'assets', Path(temporary) / 'assets')
+    for folder in ('assets', 'include', 'src'):
+        shutil.copytree(ROOT / folder, Path(temporary) / folder)
     # Неверный выбор повторно запрашивается, не принимается молча.
     answer = 'oops\n4\n1\n0\n5\nТема <b>\nЦель\nЗадание\nВывод\n\n'
     interactive = subprocess.run([str(BIN)], cwd=temporary, input=answer, capture_output=True, text=True)
