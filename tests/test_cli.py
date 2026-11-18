@@ -4,10 +4,15 @@ import signal
 import subprocess
 import tempfile
 from pathlib import Path
+from urllib.parse import urlsplit, unquote
 from html.parser import HTMLParser
 
 ROOT = Path(__file__).resolve().parents[1]
 BIN = ROOT / 'build/lab5'
+
+def reports(result):
+    return [Path(unquote(urlsplit(line.removeprefix('Ссылка: ')).path))
+            for line in result.stdout.splitlines() if line.startswith('Ссылка: ')]
 
 class Images(HTMLParser):
     def __init__(self):
@@ -20,12 +25,27 @@ with tempfile.TemporaryDirectory() as temporary:
     p = subprocess.run([str(BIN), '--demo', str(out)], cwd=ROOT, capture_output=True, text=True)
     assert p.returncode == 0, p.stderr
     names = ['Программирование', 'Информатика', 'Технологии и методы программирования']
-    for index, name in enumerate(names, 1):
-        report = out / f'discipline-{index}/report.html'
+    first_reports = reports(p)
+    assert len(first_reports) == 3 and len(set(first_reports)) == 3
+    texts = []
+    for report, name in zip(first_reports, names):
         text = report.read_text()
+        texts.append(text)
         assert name in text and '<table>' in text and '<code>' in text
         parser = Images(); parser.feed(text)
         assert all((report.parent / path).is_file() for path in parser.paths)
+    expected_titles = ['Генерация HTML-отчётов. Паттерн Строитель',
+                       'Представление и хранение информации',
+                       'Разделение ответственности и повторное использование компонентов']
+    for index, text in enumerate(texts):
+        # Проверяем именно видимые разделы, не встроенный листинг программы.
+        visible = text.split('<details>')[0]
+        assert expected_titles[index] in visible
+        assert all(title not in visible for j, title in enumerate(expected_titles) if j != index)
+    again = subprocess.run([str(BIN), '--demo', str(out)], cwd=ROOT, capture_output=True, text=True)
+    assert again.returncode == 0, again.stderr
+    assert set(first_reports).isdisjoint(reports(again))
+    assert all(path.read_text() == text for path, text in zip(first_reports, texts))
     bad = subprocess.run([str(BIN), '--unknown'], cwd=ROOT, capture_output=True)
     assert bad.returncode == 1
     missing = subprocess.run([str(BIN), '--demo'], cwd=temporary, capture_output=True)
@@ -37,7 +57,8 @@ with tempfile.TemporaryDirectory() as temporary:
     interactive = subprocess.run([str(BIN)], cwd=temporary, input=answer, capture_output=True, text=True)
     assert interactive.returncode == 0, interactive.stderr
     assert interactive.stdout.count('Введите целое число') == 3
-    custom = (Path(temporary) / 'generated/custom/report.html').read_text()
+    first_custom = reports(interactive)[0]
+    custom = first_custom.read_text()
     assert 'Тема &lt;b&gt;' in custom
     # Ошибочный путь не сбрасывает уже введённые данные.
     answer = ('1\n5\n\nТема сохранена\nЦель\nЗадание\nВывод\n'
@@ -46,8 +67,11 @@ with tempfile.TemporaryDirectory() as temporary:
     assert retry.returncode == 0, retry.stderr
     assert retry.stdout.count('Путь к скриншоту') == 3
     assert retry.stdout.count('Тема работы:') == 2
-    assert 'Тема сохранена' in (Path(temporary) / 'generated/custom/report.html').read_text()
-    assert (Path(temporary) / 'generated/custom/assets/screenshot.png').is_file()
+    retry_report = reports(retry)[0]
+    assert retry_report != first_custom
+    assert first_custom.read_text() == custom
+    assert 'Тема сохранена' in retry_report.read_text()
+    assert (retry_report.parent / 'assets/screenshot.png').is_file()
     # После ошибки можно отказаться от рисунка пустой строкой.
     skip = subprocess.run([str(BIN)], cwd=temporary,
         input='1\n5\nТема\nЦель\nЗадание\nВывод\nmissing.jpg\n\n', capture_output=True, text=True)

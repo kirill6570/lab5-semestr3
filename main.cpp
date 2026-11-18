@@ -14,7 +14,7 @@
 using namespace std;
 namespace fs = filesystem;
 
-// Исходные данные. Одни и те же поля используются для трёх дисциплин.
+// Исходные данные.  используются для трёх дисциплин.
 struct LabData {
     string discipline, author, group, title, goal, task, conclusion, date;
     int number = 5;
@@ -61,7 +61,7 @@ string currentDate() {
     return out.str();
 }
 
-// Продукт: готовый документ. Данные закрыты от прямого изменения извне.
+// Продукт: готовый документ.
 class Report {
     string html;
 public:
@@ -70,7 +70,7 @@ public:
     void save(const fs::path& path) const { writeFile(path, html); }
 };
 
-// Абстрактный строитель задаёт шаги построения, но не формат документа.
+// Абстрактный строитель задаёт шаги построения
 class ReportBuilder {
 public:
     virtual ~ReportBuilder() = default;
@@ -84,7 +84,7 @@ public:
     virtual Report getResult() const = 0;
 };
 
-// Конкретный строитель создаёт HTML. Другой формат можно добавить наследником.
+// Конкретный строитель 
 class HtmlReportBuilder : public ReportBuilder {
     Report report;
     LabData data;
@@ -191,7 +191,6 @@ string makeChart(bool hasScreenshot) {
     return svg + "</g></svg>";
 }
 
-// Проверяем путь до генерации, чтобы ошибку ввода можно было исправить.
 void validateScreenshot(const fs::path& path) {
     if (path.empty()) return;
     const string ext = path.extension().string();
@@ -202,6 +201,30 @@ void validateScreenshot(const fs::path& path) {
         throw runtime_error("Файл не найден или недоступен: " + path.string());
     ifstream image(path, ios::binary);
     if (!image) throw runtime_error("Не удалось открыть изображение: " + path.string());
+}
+
+// Каждый запуск получает свободную папку; старые отчёты сохраняются.
+fs::path newReportDirectory(const fs::path& root, const string& prefix) {
+    fs::create_directories(root);
+    for (int number = 1; ; ++number) {
+        ostringstream name;
+        name << prefix << '-' << setfill('0') << setw(3) << number;
+        fs::path candidate = root / name.str();
+        if (fs::create_directory(candidate)) return candidate;
+    }
+}
+
+string fileUrl(const fs::path& path) {
+    const string bytes = fs::absolute(path).generic_string();
+    const char* hex = "0123456789ABCDEF";
+    string url = "file://";
+    for (unsigned char c : bytes) {
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9') || c == '/' || c == '-' || c == '_' || c == '.' || c == '~')
+            url += static_cast<char>(c);
+        else { url += '%'; url += hex[c >> 4]; url += hex[c & 15]; }
+    }
+    return url;
 }
 
 void generate(LabData data, const fs::path& output, const fs::path& assets) {
@@ -220,6 +243,7 @@ void generate(LabData data, const fs::path& output, const fs::path& assets) {
     Report report = director.construct(*builder, data);
     report.save(output / "report.html");
     cout << "Создан отчёт: " << fs::absolute(output / "report.html") << '\n';
+    cout << "Ссылка: " << fileUrl(output / "report.html") << '\n';
 }
 
 string ask(const string& prompt) {
@@ -275,25 +299,41 @@ int main(int argc, char* argv[]) {
         data.date = currentDate();
         data.source = readFile("main.cpp");
         if (demo) {
-            data.title = "Генерация отчётов. Паттерн Строитель";
-            data.goal = "Освоить пошаговое построение HTML-документа с использованием наследования и полиморфизма.";
-            data.task = "Сформировать демонстрационный отчёт с титульным листом, целью, UML, листингом, таблицей, диаграммами и рисунком.";
-            data.conclusion = "Демонстрационный документ сформирован. Директор определяет последовательность шагов, а HTML-строитель — представление разделов.";
+            const vector<vector<string>> examples = {
+                {"Генерация HTML-отчётов. Паттерн Строитель",
+                 "Изучить наследование и полиморфизм при пошаговой сборке документа.",
+                 "Разработать классы продукта, абстрактного строителя, HTML-строителя и Директора. Сформировать отчёт с таблицей и изображениями.",
+                 "В примере показана сборка HTML-документа: Директор задаёт последовательность, а конкретный строитель создаёт разделы."},
+                {"Представление и хранение информации",
+                 "Рассмотреть текстовое, табличное и графическое представление информации.",
+                 "Сформировать учебный документ по информатике. Представить структуру документа таблицей, добавить SVG-диаграммы и поясняющий рисунок.",
+                 "В примере информация представлена текстом, таблицей и графикой. Документ и связанные ресурсы сохранены отдельными файлами."},
+                {"Разделение ответственности и повторное использование компонентов",
+                 "Рассмотреть организацию программы из компонентов с отдельными обязанностями.",
+                 "Описать взаимодействие данных, строителя, Директора и продукта. Продемонстрировать повторное использование алгоритма сборки для разных дисциплин.",
+                 "В примере общий алгоритм использован с другим набором данных. Разделение ответственности позволяет изменять содержание без изменения порядка сборки."}
+            };
+            const fs::path batch = newReportDirectory(output, "demo");
             if (fs::exists("assets/demo-preview.png")) data.screenshot = "assets/demo-preview.png";
             for (size_t i = 0; i < disciplines.size(); ++i) {
                 data.discipline = disciplines[i];
-                generate(data, output / ("discipline-" + to_string(i + 1)), "assets");
+                data.title = examples[i][0];
+                data.goal = examples[i][1];
+                data.task = examples[i][2];
+                data.conclusion = examples[i][3];
+                generate(data, batch / ("discipline-" + to_string(i + 1)), "assets");
             }
         } else {
             for (size_t i = 0; i < disciplines.size(); ++i) cout << i + 1 << ". " << disciplines[i] << '\n';
-            data.discipline = disciplines[askNumber("Дисциплина (1–3): ", 1, 3) - 1];
+            const int discipline = askNumber("Дисциплина (1–3): ", 1, 3);
+            data.discipline = disciplines[discipline - 1];
             data.number = askNumber("Номер лабораторной работы (1–99): ", 1, 99);
             data.title = askRequired("Тема работы: ");
             data.goal = askRequired("Цель работы: ");
             data.task = askRequired("Задание: ");
             data.conclusion = askRequired("Вывод: ");
             data.screenshot = askScreenshot();
-            generate(data, output / "custom", "assets");
+            generate(data, newReportDirectory(output, "discipline-" + to_string(discipline) + "-report"), "assets");
         }
         return 0;
     } catch (const exception& error) {
